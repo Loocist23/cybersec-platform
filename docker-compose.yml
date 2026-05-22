@@ -1,0 +1,88 @@
+version: '3.8'
+
+# Docker Compose pour la plateforme Cybersec
+# Lance : PostgreSQL, API Service, Aggregator Service
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: cybersec_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cybersec_db}
+      POSTGRES_USER: ${POSTGRES_USER:-cybersec_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cybersec_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cybersec_user} -d ${POSTGRES_DB:-cybersec_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cybersec_network
+
+  # API Service (FastAPI)
+  api:
+    build:
+      context: ./api-service
+      dockerfile: Dockerfile
+    container_name: cybersec_api
+    restart: unless-stopped
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-cybersec_db}
+      - DB_USER=${POSTGRES_USER:-cybersec_user}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-cybersec_password}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-cybersec_user}:${POSTGRES_PASSWORD:-cybersec_password}@postgres:5432/${POSTGRES_DB:-cybersec_db}
+      - LOG_LEVEL=INFO
+      - ALLOW_ORIGINS=*
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api-service/logs:/app/logs
+    networks:
+      - cybersec_network
+
+  # Aggregator Service
+  aggregator:
+    build:
+      context: ./aggregator-service
+      dockerfile: Dockerfile
+    container_name: cybersec_aggregator
+    restart: unless-stopped
+    environment:
+      - NVD_API_URL=https://services.nvd.nist.gov/rest/json/cves/2.0
+      - DB_PATH=/app/data/aggregator.db
+      - INITIAL_DAYS_BACK=7
+      - MAX_CVE_PER_REQUEST=50
+      - NVD_REQUEST_DELAY=30
+      - LOG_LEVEL=INFO
+      # Configuration pour envoyer à l'API
+      - API_URL=http://api:8000
+      - USE_API=true
+    volumes:
+      - ./aggregator-service/data:/app/data
+      - ./aggregator-service/logs:/app/logs
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - cybersec_network
+
+networks:
+  cybersec_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
