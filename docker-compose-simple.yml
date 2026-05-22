@@ -1,0 +1,53 @@
+version: '3.8'
+
+# Docker Compose SIMPLE - PostgreSQL + API uniquement
+# Parfait pour démarrer rapidement
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: cybersec_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cybersec_db
+      POSTGRES_USER: cybersec_user
+      POSTGRES_PASSWORD: cybersec_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cybersec_user -d cybersec_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # API Service (FastAPI)
+  api:
+    build:
+      context: ./api-service
+      dockerfile: Dockerfile
+    container_name: cybersec_api
+    restart: unless-stopped
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DB_HOST=postgres  # ← Ici on utilise le nom du service Docker
+      - DB_PORT=5432
+      - DB_NAME=cybersec_db
+      - DB_USER=cybersec_user
+      - DB_PASSWORD=cybersec_password
+      - DATABASE_URL=postgresql://cybersec_user:cybersec_password@postgres:5432/cybersec_db
+      - LOG_LEVEL=INFO
+      - ALLOW_ORIGINS=*
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api-service/logs:/app/logs
+
+volumes:
+  postgres_data:
