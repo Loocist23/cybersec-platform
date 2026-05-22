@@ -1,7 +1,7 @@
 version: '3.8'
 
 # Docker Compose pour la plateforme Cybersec
-# Lance : PostgreSQL, API Service, Aggregator Service
+# Lance PostgreSQL et permet de lancer API/Aggregator manuellement
 
 services:
   # Base de données PostgreSQL
@@ -25,7 +25,8 @@ services:
     networks:
       - cybersec_network
 
-  # API Service (FastAPI)
+  # API Service (FastAPI) - Lancer manuellement
+  # docker-compose run --service-ports api
   api:
     build:
       context: ./api-service
@@ -53,13 +54,13 @@ services:
     networks:
       - cybersec_network
 
-  # Aggregator Service
+  # Aggregator Service - Lancer manuellement
+  # docker-compose run aggregator python -m cybersec_aggregator.main --days 1 --send-to-api
   aggregator:
     build:
       context: ./aggregator-service
       dockerfile: Dockerfile
     container_name: cybersec_aggregator
-    restart: unless-stopped
     environment:
       - NVD_API_URL=https://services.nvd.nist.gov/rest/json/cves/2.0
       - DB_PATH=/app/data/aggregator.db
@@ -67,9 +68,9 @@ services:
       - MAX_CVE_PER_REQUEST=50
       - NVD_REQUEST_DELAY=30
       - LOG_LEVEL=INFO
-      # Configuration pour envoyer à l'API
-      - API_URL=http://api:8000
       - USE_API=true
+      - API_URL=http://api:8000
+      - USE_SQLITE=false
     volumes:
       - ./aggregator-service/data:/app/data
       - ./aggregator-service/logs:/app/logs
