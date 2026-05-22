@@ -1,120 +1,186 @@
 # 🚀 Quick Start - Cybersec Platform
 
-> **Guide ultra-rapide pour lancer la plateforme**
+> **Guide ultra-rapide pour lancer la plateforme en 5 minutes**
 
 ---
 
-## Étape 0 : Préquis
-- Docker installé
-- Python 3.10+ installé
+## Étape 0 : Prérequis
+- Docker installé et démarré
+- Docker Compose installé
+- Python 3.12+ installé
 - Accès internet (pour télécharger les images Docker)
 
 ---
 
-## Étape 1 : Lancer PostgreSQL (1 commande)
+## 🎯 Méthode 1 : Démarrage complet avec Docker (Recommandé)
 
+### 1. Lancer tous les services
 ```bash
 cd /home/loocist/PycharmProjects/cybersec-platform
 
-# Lancer UNIQUEMENT PostgreSQL
-docker-compose up -d postgres
+# Construire et lancer PostgreSQL + API
+docker-compose -f docker-compose-simple.yml up -d
 
-# Vérifier que PostgreSQL est prêt
-docker-compose ps
-# → Tu dois voir "cybersec_postgres" avec "Up (healthy)"
+# Attendre que PostgreSQL soit prêt (30 secondes)
+sleep 30
+
+# Vérifier que tout tourne
+docker-compose -f docker-compose-simple.yml ps
+# → Tu dois voir "cybersec_postgres" et "cybersec_api" avec "Up (healthy)"
 ```
 
-**Problème ?**
+### 2. Tester l'API
 ```bash
-# Voir les logs
-docker-compose logs postgres
+# Health check
+curl http://localhost:8000/
 
-# Redémarrer
-docker-compose down && docker-compose up -d postgres
+# Documentation Swagger (dans ton navigateur)
+# Ouvre : http://localhost:8000/docs
+
+# Lister les CVE (vide pour l'instant)
+curl http://localhost:8000/cves/
 ```
 
----
-
-## Étape 2 : Configurer l'API Service (manuellement)
-
-### Ouvrir un nouveau terminal :
+### 3. Collecter les premières CVE
 ```bash
-cd /home/loocist/PycharmProjects/cybersec-platform/api-service
-
-# Créer un environnement virtuel
-python -m venv .venv
-source .venv/bin/activate
-
-# Installer les dépendances (une seule fois)
-pip install fastapi uvicorn sqlalchemy psycopg2-binary python-dotenv pydantic
-
-# Copier la config
-cp .env.example .env
-
-# Lancer l'API
-uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**Tester l'API** : Ouvre http://localhost:8000/docs dans ton navigateur ✅
-
----
-
-## Étape 3 : Configurer l'Aggregator Service (manuellement)
-
-### Ouvrir un NOUVEAU terminal :
-```bash
-cd /home/loocist/PycharmProjects/cybersec-platform/aggregator-service
-
-# Créer un environnement virtuel
-python -m venv .venv
-source .venv/bin/activate
-
-# Installer les dépendances (une seule fois)
-pip install requests python-dotenv pydantic
-
-# Copier la config
-cp .env.example .env
-
-# Modifier le .env pour utiliser l'API
-nano .env
-```
-
-**Dans le .env, changer ces lignes :**
-```
-USE_API=true
-API_URL=http://localhost:8000  # PAS http://api:8000 (car on est en local)
-USE_SQLITE=false
-```
-
----
-
-## Étape 4 : Tester l'envoi à l'API
-
-### Dans le terminal de l'agregator :
-```bash
-# Récupérer les CVE et les envoyer à l'API
-python -m cybersec_aggregator.main --days 1 --send-to-api
+# Récupérer les CVE des 2 derniers jours et les envoyer à l'API
+docker-compose run aggregator python -m cybersec_aggregator.main --days 2 --send-to-api
 ```
 
 **Résultat attendu :**
 ```
-✅ X CVE envoyées à l'API
+🔍 Récupération des CVE des 2 derniers jours...
+✅ 45 CVE trouvées
+✅ 45 CVE envoyées à l'API
+```
+
+### 4. Vérifier les données
+```bash
+# Lister les CVE
+curl http://localhost:8000/cves/ | python -m json.tool | head -20
+
+# Statistiques
+curl http://localhost:8000/cves/stats
+```
+
+### 5. (Optionnel) Lancer l'analyse IA
+```bash
+# Analyser les CVE collectées
+docker-compose run ai-service python -m ai_service.main --days 2
+```
+
+**Résultat attendu :**
+```
+🔍 Récupération de 45 CVE depuis l'API...
+🧠 Analyse en cours avec Mistral AI...
+✅ 3 groupes de CVE similaires identifiés
+✅ 3 analyses créées et envoyées à l'API
+```
+
+### 6. Vérifier les analyses
+```bash
+# Lister les analyses générées
+curl http://localhost:8000/analyses/ | python -m json.tool
 ```
 
 ---
 
-## Étape 5 : Vérifier que les CVE sont en base
+## 🎯 Méthode 2 : Développement local (sans Docker)
 
-### Dans le terminal de l'API (ou un nouveau terminal) :
+### 1. Lancer PostgreSQL
 ```bash
-# Lister les CVE via l'API
-curl http://localhost:8000/cves/
+# Avec Docker (le plus simple)
+docker run -d --name postgres -e POSTGRES_PASSWORD=cybersec_password -p 5432:5432 postgres:15
 
-# Voir les stats
-curl http://localhost:8000/cves/stats
+# Attendre 30 secondes que PostgreSQL démarre
+sleep 30
+
+# Vérifier
+psql -h localhost -U postgres
+# (mot de passe : cybersec_password)
 ```
 
-**Ou ouvre** http://localhost:8000/docs **et teste les endpoints** ✅
+### 2. Lancer l'API Service
+```bash
+cd /home/loocist/PycharmProjects/cybersec-platform/api-service
+
+# Créer l'environnement virtuel (une seule fois)
+python -m venv .venv
+
+# Activer et installer les dépendances
+source .venv/bin/activate
+pip install -e .
+
+# Copier la configuration
+cp .env.example .env
+
+# Lancer l'API
+python -m api.main
+```
+
+**Tester** : Ouvre http://localhost:8000/docs dans ton navigateur ✅
+
+### 3. Lancer l'Aggregator Service
+```bash
+# Dans un NOUVEAU terminal
+cd /home/loocist/PycharmProjects/cybersec-platform/aggregator-service
+
+# Créer l'environnement virtuel
+python -m venv .venv
+source .venv/bin/activate
+
+# Installer les dépendances
+pip install -e .
+
+# Copier la configuration
+cp .env.example .env
+
+# Modifier .env pour utiliser l'API locale
+nano .env
+```
+
+**Dans le .env, s'assurer que :**
+```
+USE_API=true
+API_URL=http://localhost:8000
+USE_SQLITE=false
+```
+
+### 4. Collecter les CVE
+```bash
+# Dans le terminal de l'agregator
+python -m cybersec_aggregator.main --days 2 --send-to-api
+```
+
+### 5. (Optionnel) Lancer l'AI Service
+```bash
+# Dans un NOUVEAU terminal
+cd /home/loocist/PycharmProjects/cybersec-platform/ai-service
+
+# Créer l'environnement virtuel
+python -m venv .venv
+source .venv/bin/activate
+
+# Installer les dépendances
+pip install -e .
+
+# Copier la configuration
+cp .env.example .env
+
+# Modifier .env
+nano .env
+```
+
+**Dans le .env, configurer :**
+```
+API_BASE_URL=http://localhost:8000
+MISTRAL_API_KEY=ta_clef_api_mistral  # Optionnel, pour l'IA
+```
+
+**Lancer l'analyse** :
+```bash
+python -m ai_service.main --days 2
+```
 
 ---
 
@@ -122,62 +188,128 @@ curl http://localhost:8000/cves/stats
 
 | Action | Commande |
 |--------|----------|
-| **Lancer PostgreSQL** | `docker-compose up -d postgres` |
-| **Arrêter PostgreSQL** | `docker-compose down` |
-| **Lancer l'API** | `uvicorn api.main:app --host 0.0.0.0 --port 8000` |
-| **Lancer l'agregator** | `python -m cybersec_aggregator.main --days 1 --send-to-api` |
+| **Lancer PostgreSQL** | `docker-compose -f docker-compose-simple.yml up -d postgres` |
+| **Lancer l'API** | `docker-compose -f docker-compose-simple.yml up -d api` |
+| **Arrêter tout** | `docker-compose -f docker-compose-simple.yml down` |
+| **Collecter CVE** | `docker-compose run aggregator python -m cybersec_aggregator.main --days 7 --send-to-api` |
+| **Analyse IA** | `docker-compose run ai-service python -m ai_service.main --days 7` |
 | **Voir les CVE** | `curl http://localhost:8000/cves/` |
-| **Stats** | `curl http://localhost:8000/cves/stats` |
+| **Voir les analyses** | `curl http://localhost:8000/analyses/` |
+| **Stats CVE** | `curl http://localhost:8000/cves/stats` |
+| **Stats Analyses** | `curl http://localhost:8000/analyses/stats` |
+| **Health check** | `curl http://localhost:8000/health` |
+| **Docs Swagger** | Ouvre http://localhost:8000/docs |
 
 ---
 
 ## 🔧 Problèmes courants
 
-### Problème 1 : PostgreSQL ne démarre pas
+### ❌ Problème 1 : PostgreSQL ne démarre pas
+**Symptômes** : `docker-compose ps` montre "unhealthy"
+
+**Solution** :
 ```bash
-# Vérifier les logs
-docker-compose logs postgres
+# Voir les logs
+docker-compose -f docker-compose-simple.yml logs postgres
 
-# Essayez de redémarrer
-docker-compose down -v && docker-compose up -d postgres
+# Redémarrer avec suppression des volumes
+docker-compose -f docker-compose-simple.yml down -v
+docker-compose -f docker-compose-simple.yml up -d postgres
 ```
 
-### Problème 2 : Erreur de connexion à la base
-```
+### ❌ Problème 2 : Erreur de connexion à PostgreSQL
+**Symptômes** : `connection refused` ou `could not connect to server`
+
+**Solution** :
+```bash
 # Vérifier que PostgreSQL est prêt
-docker-compose ps
+sleep 30 && docker-compose -f docker-compose-simple.yml ps
 
 # Tester la connexion manuellement
-psql -h localhost -U cybersec_user -d cybersec_db
-# Mot de passe : cybersec_password
+docker-compose -f docker-compose-simple.yml exec postgres psql -U cybersec_user -d cybersec_db
+
+# Si tu utilises l'API manuellement (sans docker-compose)
+# Assure-toi que .env contient :
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_USER=cybersec_user
+# DB_PASSWORD=cybersec_password
+# DB_NAME=cybersec_db
 ```
 
-### Problème 3 : Port 8000 déjà utilisé
+### ❌ Problème 3 : Port 8000 déjà utilisé
+**Symptômes** : `Address already in use`
+
+**Solution** :
 ```bash
 # Trouver qui utilise le port
 lsof -i :8000
 
-# Changer le port de l'API
-uvicorn api.main:app --host 0.0.0.0 --port 8001
+# Tuer le processus
+kill -9 <PID>
+
+# Ou changer le port dans api-service/.env
+PORT=8001
 ```
 
-### Problème 4 : Erreur pip/uv (problème réseau)
-C'est un problème de connexion internet. Essaie :
+### ❌ Problème 4 : Erreur pip/uv (problème réseau)
+**Symptômes** : Timeout lors de l'installation
+
+**Solution** :
 ```bash
 # Vérifier ta connexion
 ping google.com
 
-# Si ça marche pas, utilise ton téléphone en partage de connexion
-# Ou attends que ton réseau soit de retour
+# Essayer avec le miroir de PyPI
+pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple -e .
+```
+
+### ❌ Problème 5 : "ModuleNotFoundError: No module named 'fastapi'"
+**Symptômes** : L'API ne démarre pas
+
+**Solution** :
+```bash
+cd api-service
+source .venv/bin/activate
+pip install -e .
+```
+
+### ❌ Problème 6 : "AttributeError: 'str' object has no attribute 'value'"
+**Symptômes** : Erreur 500 sur POST /analyses/
+
+**Solution** : 
+Cette erreur est corrigée dans la dernière version. Assure-toi que api-service est à jour :
+```bash
+cd api-service
+git pull origin master
 ```
 
 ---
 
-## 🎯 Résumé
+## 📋 Checklist
 
-1. ✅ `docker-compose up -d postgres` → PostgreSQL tourne
-2. ✅ Lancer l'API manuellement avec `uvicorn`
-3. ✅ Lancer l'agregator manuellement avec `python -m cybersec_aggregator.main --send-to-api`
-4. ✅ Vérifier avec `curl http://localhost:8000/cves/`
+- [ ] PostgreSQL tourne (`docker-compose -f docker-compose-simple.yml ps`)
+- [ ] API tourne (`curl http://localhost:8000/health`)
+- [ ] Aggregator a envoyé des CVE (`curl http://localhost:8000/cves/`)
+- [ ] AI Service a généré des analyses (`curl http://localhost:8000/analyses/`)
 
-**Tout est prêt !** 🚀
+---
+
+## 🎉 Tout est prêt !
+
+Tu as maintenant une plateforme complète de cybersécurité avec :
+- ✅ **Aggregator** : Récupère les CVE depuis NVD
+- ✅ **API** : Stocke et expose les données
+- ✅ **AI Service** : Analyse et groupe les CVE intelligemment
+- ✅ **PostgreSQL** : Base de données persistante
+
+**Prochaines étapes :**
+1. Automatiser avec cron : `0 */6 * * * docker-compose run aggregator python -m cybersec_aggregator.main --days 6 --send-to-api`
+2. Configurer Mistral API key pour l'analyse IA
+3. Ajouter un dashboard pour visualiser les données
+
+---
+
+## 📚 Documentation complète
+
+Pour plus de détails, voir : [README.md](./README.md)
