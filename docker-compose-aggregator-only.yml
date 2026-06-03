@@ -1,5 +1,5 @@
-# Docker Compose pour la plateforme Cybersec
-# Lance PostgreSQL, API, Aggregator et Twitter Service
+# Docker Compose pour lancer UNIQUEMENT l'aggregator-service + ses dépendances
+# Lance PostgreSQL, API et Aggregator (sans Twitter et AI)
 
 services:
   # Base de données PostgreSQL
@@ -7,9 +7,6 @@ services:
     image: postgres:15-alpine
     container_name: cybersec_postgres
     restart: unless-stopped
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     networks:
       - my_bridge
     environment:
@@ -33,9 +30,6 @@ services:
       dockerfile: Dockerfile
     container_name: cybersec_api
     restart: unless-stopped
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     networks:
       - my_bridge
     environment:
@@ -57,93 +51,28 @@ services:
     volumes:
       - ./api-service/logs:/app/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # Aggregator Service
+  # Aggregator Service (SEUL) - VERSION SIMPLE
   aggregator:
     build:
       context: ./aggregator-service
       dockerfile: Dockerfile
     container_name: cybersec_aggregator
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    restart: unless-stopped
     networks:
       - my_bridge
     environment:
-      - NVD_API_URL=https://services.nvd.nist.gov/rest/json/cves/2.0
-      - DB_PATH=/app/data/aggregator.db
-      - INITIAL_DAYS_BACK=7
-      - MAX_CVE_PER_REQUEST=50
-      - NVD_REQUEST_DELAY=30
-      - LOG_LEVEL=INFO
-      - USE_API=true
       - API_URL=http://api:8000
-      - USE_SQLITE=false
+      - NVD_API_URL=https://services.nvd.nist.gov/rest/json/cves/2.0
+      - INITIAL_DAYS_BACK=7
+      - NVD_REQUEST_DELAY=30
     volumes:
       - ./aggregator-service/data:/app/data
       - ./aggregator-service/logs:/app/logs
-    depends_on:
-      api:
-        condition: service_healthy
-
-  # Twitter Service (NOUVEAU)
-  twitter:
-    build:
-      context: ./twitter-service
-      dockerfile: Dockerfile
-    container_name: cybersec_twitter
-    restart: unless-stopped
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    networks:
-      - my_bridge
-    environment:
-      - API_URL=http://api:8000
-      - API_BASE_URL=http://api:8000
-      - SEARCH_QUERIES=cybersecurity,vulnerability,infosec,CVE,malware,hacking,exploit,zero-day
-      - SEARCH_DAYS_BACK=7
-      - MAX_TWEETS_PER_REQUEST=50
-      - REQUEST_DELAY=5
-      - MIN_LIKES=0
-      - MIN_RETWEETS=0
-      - LANGUAGE=en
-      - LOG_LEVEL=INFO
-      - DAEMON_INTERVAL_HOURS=24
-    volumes:
-      - ./twitter-service/logs:/app/logs
-      - ./twitter-service/data:/app/data
-    depends_on:
-      api:
-        condition: service_healthy
-    # Commande par défaut : mode daemon
-    command: ["uv", "run", "python", "-m", "twitter_service.main", "--daemon"]
-
-  # AI Service (optionnel)
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
-    container_name: cybersec_ai
-    networks:
-      - my_bridge
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    environment:
-      - API_BASE_URL=http://api:8000
-      - CVES_ENDPOINT=/cves/
-      - ANALYSES_ENDPOINT=/analyses/
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-""}
-      - MISTRAL_MODEL=mistral-tiny
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./ai-service/logs:/app/logs
-      - ./ai-service/data:/app/data
     depends_on:
       api:
         condition: service_healthy
