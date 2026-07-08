@@ -1,0 +1,9 @@
+[submodule "aggregator-service"]
+	path = aggregator-service
+	url = https://github.com/Loocist23/aggregator-service.git
+[submodule "api-service"]
+	path = api-service
+	url = https://github.com/Loocist23/api-service.git
+[submodule "cybersec-web"]
+	path = cybersec-web
+	url = https://github.com/Loocist23/cybersec-web.git
