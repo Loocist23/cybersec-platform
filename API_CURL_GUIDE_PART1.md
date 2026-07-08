@@ -460,9 +460,7 @@ done
 
 ## 📚 Voir aussi
 
-- [API_CURL_GUIDE_PART2.md](./API_CURL_GUIDE_PART2.md) - Analyses + Tweets endpoints
-- [API_CURL_GUIDE_PART3.md](./API_CURL_GUIDE_PART3.md) - Accounts + Exemples Pratiques
-- [DOCUMENTATION_COMPLETE.md](./DOCUMENTATION_COMPLETE.md) - Documentation complète
+- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Tableau récapitulatif de tous les endpoints
 
 ---
 

@@ -20,12 +20,7 @@ cybersec-platform/
 │   ├── pyproject.toml
 │   ├── src/
 │   └── .env.example
-├── api-service/               # Microservice : API + PostgreSQL
-│   ├── Dockerfile
-│   ├── pyproject.toml
-│   ├── src/
-│   └── .env.example
-└── ai-service/                # Microservice : Analyse IA des CVE
+└── api-service/               # Microservice : API + PostgreSQL
     ├── Dockerfile
     ├── pyproject.toml
     ├── src/
@@ -38,7 +33,6 @@ cybersec-platform/
 |---------|------|-------------|
 | **aggregator-service** | - | Récupère les CVE depuis l'API NVD |
 | **api-service** | 8000 | API FastAPI avec PostgreSQL |
-| **ai-service** | 8001 | Service d'analyse IA (groupement, classification) |
 | **postgres** | 5432 | Base de données PostgreSQL |
 
 ---
@@ -85,19 +79,7 @@ source .venv/bin/activate
 python -m cybersec_aggregator.main --days 7 --send-to-api
 ```
 
-### 5. Lancer l'analyse IA
-```bash
-# Avec Docker
-cd cybersec-platform
-docker-compose run ai-service python -m ai_service.main
-
-# Manuellement
-cd ai-service
-source .venv/bin/activate
-python -m ai_service.main
-```
-
-### 6. Tester l'API
+### 5. Tester l'API
 ```bash
 # Health check
 curl http://localhost:8000/
@@ -209,44 +191,7 @@ LOG_LEVEL=INFO
 ALLOW_ORIGINS=*
 ```
 
-### AI Service
 
-**Rôle** : Service d'analyse intelligente des CVE avec IA (Mistral).
-
-**Fonctionnalités** :
-- Récupération des CVE depuis l'API Service
-- Groupement intelligent des CVE similaires
-- Génération de titres et résumés avec l'IA
-- Classification par sévérité globale
-- Calcul de score de confiance
-- Envoi des analyses à l'API Service
-
-**Configuration** :
-```bash
-# Variables d'environnement (dans ai-service/.env)
-API_BASE_URL=http://localhost:8000
-CVES_ENDPOINT=/cves/
-ANALYSES_ENDPOINT=/analyses/
-MISTRAL_API_KEY=votre_clef_api_mistral
-MISTRAL_MODEL=mistral-tiny  # ou mistral-small, mistral-medium
-GROUPING_THRESHOLD=0.85     # Seuil de similarité pour le groupement
-LOG_LEVEL=INFO
-```
-
-**Commandes** :
-```bash
-# Lancer une analyse complète
-python -m ai_service.main
-
-# Analyser les CVE des 7 derniers jours
-python -m ai_service.main --days 7
-
-# Avec un modèle spécifique
-python -m ai_service.main --model mistral-small
-
-# Mode debug
-python -m ai_service.main --days 1 --log-level DEBUG
-```
 
 ### PostgreSQL
 
@@ -263,28 +208,25 @@ POSTGRES_PASSWORD=cybersec_password
 **Structure de la base** :
 - Table `cves` : Stockage des vulnérabilités CVE
 - Table `cve_references` : URLs de référence des CVE
-- Table `cve_analyses` : Analyses IA générées
-- Table `cve_analysis_mappings` : Relation entre analyses et CVEs
 
 ---
 
 ## 📊 Flux de données
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │     │                 │
-│   NVD API       │────▶│  Aggregator     │────▶│   API Service   │◀────│   AI Service     │
-│  (External)     │     │   Service       │     │  (FastAPI)       │     │                 │
-│                 │     │                 │     │                 │     │                 │
-└─────────────────┘     └──────────┬──────┘     └──────────┬──────┘     └──────────┬──────┘
-                                    │                      │                   │
-                                    ▼                      ▼                   ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│   NVD API       │────▶│  Aggregator     │────▶│   API Service   │
+│  (External)     │     │   Service       │     │  (FastAPI)       │
+│                 │     │                 │     │                 │
+└─────────────────┘     └──────────┬──────┘     └──────────┬──────┘
+                                    │                      │
+                                    ▼                      ▼
                             ┌─────────────────────────────────────────────┐
                             │                                             │
                             │            PostgreSQL                         │
                             │   - cves table                               │
                             │   - cve_references table                     │
-                            │   - cve_analyses table                       │
                             │   - cve_analysis_mappings table              │
                             │                                             │
                             └─────────────────────────────────────────────┘
@@ -295,10 +237,6 @@ POSTGRES_PASSWORD=cybersec_password
 1. **Aggregator** → Interroge l'API NVD toutes les N heures (respectant le rate limit)
 2. **Aggregator** → Parse les CVE et les envoie à l'API via POST /cves/batch
 3. **API Service** → Valide les données et les stocke en PostgreSQL
-4. **AI Service** → Récupère les CVE via GET /cves/ et les analyse
-5. **AI Service** → Groupe les CVE similaires, génère des résumés avec l'IA
-6. **AI Service** → Envoie les analyses à l'API via POST /analyses/
-7. **API Service** → Stocke les analyses en PostgreSQL
 
 ---
 
@@ -322,9 +260,6 @@ cd aggregator-service
 uv pip install -e .
 
 cd ../api-service
-uv pip install -e .
-
-cd ../ai-service
 uv pip install -e .
 ```
 
@@ -368,16 +303,7 @@ nano .env  # Configurer API_URL=http://localhost:8000
 python -m cybersec_aggregator.main --days 1 --send-to-api
 ```
 
-#### AI Service
-```bash
-cd ai-service
-source .venv/bin/activate
 
-cp .env.example .env
-nano .env  # Configurer API_BASE_URL et MISTRAL_API_KEY
-
-# Lancer une analyse
-python -m ai_service.main --days 1
 ```
 
 ---
@@ -392,7 +318,6 @@ docker-compose build
 # Construire un service spécifique
 docker-compose build api
 docker-compose build aggregator
-docker-compose build ai-service
 ```
 
 ### Lancer les services
@@ -415,7 +340,6 @@ docker-compose logs -f
 # Voir les logs d'un service spécifique
 docker-compose logs -f api
 docker-compose logs -f aggregator
-docker-compose logs -f ai-service
 
 # Arrêter tous les services
 docker-compose down
@@ -428,9 +352,6 @@ docker-compose down -v
 ```bash
 # Lancer une collecte manuelle
 docker-compose run aggregator python -m cybersec_aggregator.main --days 7 --send-to-api
-
-# Lancer une analyse IA
-docker-compose run ai-service python -m ai_service.main --days 7
 
 # Accéder à PostgreSQL
 docker-compose exec postgres psql -U cybersec_user -d cybersec_db
@@ -583,34 +504,6 @@ api-service/
             └── analyses.py    # Routes Analyses
 ```
 
-### AI Service
-```
-ai-service/
-├── Dockerfile
-├── pyproject.toml
-├── .env.example
-├── .gitignore
-├── README.md
-└── src/
-    └── ai_service/
-        ├── __init__.py
-        ├── config.py          # Configuration
-        ├── main.py           # Point d'entrée
-        ├── models/
-        │   ├── __init__.py
-        │   ├── cve.py         # Modèles CVE
-        │   └── analysis.py    # Modèles Analyse
-        ├── services/
-        │   ├── __init__.py
-        │   ├── analysis_service.py   # Logique d'analyse
-        │   ├── api_client.py       # Client pour l'API
-        │   ├── grouping_service.py  # Groupement des CVE
-        │   └── mistral_service.py   # Intégration Mistral AI
-        └── utils/
-            ├── __init__.py
-            └── logger.py       # Configuration des logs
-```
-
 ---
 
 ## 🔄 Intégration Git
@@ -629,12 +522,6 @@ cd api-service
 git init  # Si pas déjà fait
 git add .
 git commit -m "Initial commit"
-
-# ai-service
-cd ai-service
-git init  # Si pas déjà fait
-git add .
-git commit -m "Initial commit"
 ```
 
 Pour gérer les services comme des sous-modules (optionnel) :
@@ -644,7 +531,6 @@ cd cybersec-platform
 git init
 git submodule add ../aggregator-service aggregator-service
 git submodule add ../api-service api-service
-git submodule add ../ai-service ai-service
 git submodule update --init --recursive
 ```
 
@@ -662,17 +548,7 @@ La détection des doublons est gérée par :
 2. **API** : Le endpoint POST /cves/ vérifie l'existence avant insertion
 3. **Aggregator** : Filtrage local avant envoi
 
-### Groupement des CVE
-Le AI Service utilise un algorithme de similarité pour regrouper les CVE :
-- Similarité basée sur : vendor, product, CWE, description
-- Seuil configurable via `GROUPING_THRESHOLD`
-- Chaque groupe génère une analyse unifiée
 
-### Sévérité globale
-L'analyse calcule une sévérité globale basée sur :
-- Moyenne des scores CVSS des CVE dans chaque groupe
-- Score maximum du groupe
-- Confiance de l'analyse IA
 
 ---
 
@@ -684,11 +560,6 @@ L'analyse calcule une sévérité globale basée sur :
    0 */6 * * * cd /home/loocist/PycharmProjects/cybersec-platform/aggregator-service && \
      source .venv/bin/activate && \
      python -m cybersec_aggregator.main --days 6 --send-to-api --api-url http://localhost:8000
-   
-   # Cron job pour l'AI Service (toutes les 12 heures)
-   0 */12 * * * cd /home/loocist/PycharmProjects/cybersec-platform/ai-service && \
-     source .venv/bin/activate && \
-     python -m ai_service.main --days 12
    ```
 
 2. **Ajouter des notifications** :
@@ -711,7 +582,6 @@ L'analyse calcule une sévérité globale basée sur :
 6. **Déployer en production** :
    - Docker Swarm
    - Kubernetes
-   - Serverless (pour l'AI Service)
 
 7. **Ajouter un dashboard** :
    - Grafana pour les statistiques
@@ -733,6 +603,5 @@ Projet personnel - Tous droits réservés.
 - [PostgreSQL](https://www.postgresql.org/)
 - [Docker](https://www.docker.com/)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
-- [Mistral AI](https://mistral.ai/)
 - [Pydantic](https://docs.pydantic.dev/)
 - [Uvicorn](https://www.uvicorn.org/)

@@ -1,5 +1,5 @@
 # Docker Compose pour lancer UNIQUEMENT l'aggregator-service + ses dépendances
-# Lance PostgreSQL, API et Aggregator (sans Twitter et AI)
+# Lance PostgreSQL, API et Aggregator
 
 services:
   # Base de données PostgreSQL

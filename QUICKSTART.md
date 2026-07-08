@@ -63,26 +63,6 @@ curl http://localhost:8000/cves/ | python -m json.tool | head -20
 curl http://localhost:8000/cves/stats
 ```
 
-### 5. (Optionnel) Lancer l'analyse IA
-```bash
-# Analyser les CVE collectées
-docker-compose run ai-service python -m ai_service.main --days 2
-```
-
-**Résultat attendu :**
-```
-🔍 Récupération de 45 CVE depuis l'API...
-🧠 Analyse en cours avec Mistral AI...
-✅ 3 groupes de CVE similaires identifiés
-✅ 3 analyses créées et envoyées à l'API
-```
-
-### 6. Vérifier les analyses
-```bash
-# Lister les analyses générées
-curl http://localhost:8000/analyses/ | python -m json.tool
-```
-
 ---
 
 ## 🎯 Méthode 2 : Développement local (sans Docker)
@@ -152,35 +132,7 @@ USE_SQLITE=false
 python -m cybersec_aggregator.main --days 2 --send-to-api
 ```
 
-### 5. (Optionnel) Lancer l'AI Service
-```bash
-# Dans un NOUVEAU terminal
-cd /home/loocist/PycharmProjects/cybersec-platform/ai-service
 
-# Créer l'environnement virtuel
-python -m venv .venv
-source .venv/bin/activate
-
-# Installer les dépendances
-pip install -e .
-
-# Copier la configuration
-cp .env.example .env
-
-# Modifier .env
-nano .env
-```
-
-**Dans le .env, configurer :**
-```
-API_BASE_URL=http://localhost:8000
-MISTRAL_API_KEY=ta_clef_api_mistral  # Optionnel, pour l'IA
-```
-
-**Lancer l'analyse** :
-```bash
-python -m ai_service.main --days 2
-```
 
 ---
 
@@ -192,11 +144,8 @@ python -m ai_service.main --days 2
 | **Lancer l'API** | `docker-compose -f docker-compose-simple.yml up -d api` |
 | **Arrêter tout** | `docker-compose -f docker-compose-simple.yml down` |
 | **Collecter CVE** | `docker-compose run aggregator python -m cybersec_aggregator.main --days 7 --send-to-api` |
-| **Analyse IA** | `docker-compose run ai-service python -m ai_service.main --days 7` |
 | **Voir les CVE** | `curl http://localhost:8000/cves/` |
-| **Voir les analyses** | `curl http://localhost:8000/analyses/` |
 | **Stats CVE** | `curl http://localhost:8000/cves/stats` |
-| **Stats Analyses** | `curl http://localhost:8000/analyses/stats` |
 | **Health check** | `curl http://localhost:8000/health` |
 | **Docs Swagger** | Ouvre http://localhost:8000/docs |
 
@@ -291,7 +240,6 @@ git pull origin master
 - [ ] PostgreSQL tourne (`docker-compose -f docker-compose-simple.yml ps`)
 - [ ] API tourne (`curl http://localhost:8000/health`)
 - [ ] Aggregator a envoyé des CVE (`curl http://localhost:8000/cves/`)
-- [ ] AI Service a généré des analyses (`curl http://localhost:8000/analyses/`)
 
 ---
 
@@ -300,13 +248,11 @@ git pull origin master
 Tu as maintenant une plateforme complète de cybersécurité avec :
 - ✅ **Aggregator** : Récupère les CVE depuis NVD
 - ✅ **API** : Stocke et expose les données
-- ✅ **AI Service** : Analyse et groupe les CVE intelligemment
 - ✅ **PostgreSQL** : Base de données persistante
 
 **Prochaines étapes :**
 1. Automatiser avec cron : `0 */6 * * * docker-compose run aggregator python -m cybersec_aggregator.main --days 6 --send-to-api`
-2. Configurer Mistral API key pour l'analyse IA
-3. Ajouter un dashboard pour visualiser les données
+2. Ajouter un dashboard pour visualiser les données
 
 ---
 
